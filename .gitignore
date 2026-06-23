@@ -51,3 +51,15 @@ data/
 # ==========================================
 .DS_Store
 Thumbs.db
+
+# ==========================================
+# 5. NASA CMAPSS Dataset
+# ==========================================
+# Ignore the entire data folder
+data/
+cmapss_data/
+
+# Catch-all: Ignore any CMAPSS text files if they are loose in the project
+train_*.txt
+test_*.txt
+RUL_*.txt
