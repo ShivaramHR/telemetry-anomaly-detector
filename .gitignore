@@ -63,3 +63,7 @@ cmapss_data/
 train_*.txt
 test_*.txt
 RUL_*.txt
+
+# Added by cargo
+
+/target
