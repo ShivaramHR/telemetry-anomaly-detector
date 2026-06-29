@@ -11,7 +11,7 @@ server.bind((HOST, PORT))
 print("Server is active")
 
 #test dataset
-dataset = [[1.0, 2.0, 3.0, 4.0, 5.0]]
+dataset = [[1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 5.0]]
 
 packer = struct.Struct("<5f")
 
