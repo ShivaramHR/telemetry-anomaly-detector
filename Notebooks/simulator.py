@@ -1,6 +1,8 @@
 import time
 import struct 
 import socket
+import pandas as pd
+import numpy as np
 
 HOST = "127.0.0.1"
 PORT = 8008
@@ -11,23 +13,24 @@ server.bind((HOST, PORT))
 print("Server is active")
 
 #test dataset
-dataset = [[1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 5.0]]
+features = np.load("/Users/shivaram/telemetry-anomaly-detector/Data/Test_Data/scaled_features.npy") 
+identifier = np.load("/Users/shivaram/telemetry-anomaly-detector/Data/Test_Data/identifiers.npy")
 
-packer = struct.Struct("<5f")
 
 interval = 0.100
 next_time = time.time()
 
 try:
     _, address = server.recvfrom(1024)
-    for row in dataset:     
-        print("Sending _ bytes every 100 ms")
-        
+    for i in range(0, 2):     
         next_time += interval
 
-        byte = packer.pack(*row)
+        id = int(identifier[i])
+        feat = features[i]
 
-        server.sendto(byte, address)
+        packet = struct.pack("<I14f", id, *feat)
+
+        server.sendto(packet, address)
 
         sleep_time = next_time - time.time()
         if sleep_time > 0:

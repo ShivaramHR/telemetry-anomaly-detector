@@ -11,15 +11,16 @@ fn main() -> std::io::Result<()> {
 
     println!("Message sent to python initiating the sending process!");
 
-    let mut buf = [0;20];
+    let mut buf = [0;60];
     for _ in 0..2{
         let (amt, _src) = socket.recv_from(& mut buf)?;
-        if amt == 20 {
-            let float: Vec<f32> = buf
+        if amt == 60 {
+            let composite_id = u32::from_le_bytes(buf[0..4].try_into().unwrap());
+            let float: Vec<f32> = buf[4..60]
             .chunks_exact(4)
             .map(|chunk| f32::from_le_bytes(chunk.try_into().unwrap()))
             .collect();
-
+            println!("{}", composite_id);
             println!("{:?}", float);
         }
     }
