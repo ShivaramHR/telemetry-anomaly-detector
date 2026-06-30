@@ -1,6 +1,14 @@
 use std::net::UdpSocket;
+use ndarray::Array2;
+use ort::{inputs, session::Session};
+
 
 fn main() -> std::io::Result<()> {
+    let model_path = "/Users/shivaram/telemetry-anomaly-detector/Model/model/telemetry_autoencoder.onnx";
+
+    let mut session = Session::builder()?
+    .commit_from_file(model_path)?;
+
     let socket = UdpSocket::bind("127.0.0.1:0")?;
 
     let message = "Hey from Rust";
@@ -12,7 +20,7 @@ fn main() -> std::io::Result<()> {
     println!("Message sent to python initiating the sending process!");
 
     let mut buf = [0;60];
-    for _ in 0..2{
+    for _ in 0..1{
         let (amt, _src) = socket.recv_from(& mut buf)?;
         if amt == 60 {
             let composite_id = u32::from_le_bytes(buf[0..4].try_into().unwrap());
@@ -20,8 +28,10 @@ fn main() -> std::io::Result<()> {
             .chunks_exact(4)
             .map(|chunk| f32::from_le_bytes(chunk.try_into().unwrap()))
             .collect();
-            println!("{}", composite_id);
-            println!("{:?}", float);
+            
+            let array = Array2::<f32>::from_shape_vec((1, 14), float).unwrap();
+            
+            let outputs = session.run(inputs![array.clone()]?)?;
         }
     }
 
