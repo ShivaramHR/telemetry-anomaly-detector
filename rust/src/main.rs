@@ -3,7 +3,7 @@ use ndarray::Array2;
 use ort::{inputs, session::Session};
 
 
-fn main() -> std::io::Result<()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model_path = "/Users/shivaram/telemetry-anomaly-detector/Model/model/telemetry_autoencoder.onnx";
 
     let mut session = Session::builder()?
@@ -31,7 +31,7 @@ fn main() -> std::io::Result<()> {
             
             let array = Array2::<f32>::from_shape_vec((1, 14), float).unwrap();
             
-            let outputs = session.run(inputs![array.clone()]?)?;
+            let outputs = session.run(inputs![array.clone()])?;
         }
     }
 
