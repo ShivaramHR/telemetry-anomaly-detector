@@ -1,6 +1,7 @@
 use std::net::UdpSocket;
 use ndarray::Array2;
 use ort::{inputs, session::Session};
+use ort::value::TensorRef;
 
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,9 +30,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|chunk| f32::from_le_bytes(chunk.try_into().unwrap()))
             .collect();
             
-            let array = Array2::<f32>::from_shape_vec((1, 14), float).unwrap();
-            
-            let outputs = session.run(inputs![array.clone()])?;
+            let array = Array2::from_shape_vec((1, 14), float.clone())?;
+            let outputs = session.run(inputs![TensorRef::from_array_view(&array)?])?;
+            println!("{:?}", outputs);
         }
     }
 
