@@ -1,1 +1,0 @@
-SessionInputValue<'_>: From<Result<ArrayBase<OwnedRepr<f32>, Dim<[usize; 2]>, f32>, ShapeError>>
