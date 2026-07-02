@@ -67,3 +67,15 @@ RUL_*.txt
 # Added by cargo
 
 /target
+# Ignore the main Cargo lockfile
+Cargo.lock
+
+# Ignore any other lockfiles in the project
+*.lock
+**/ *.lock
+
+# Ignore all object files in the current directory
+*.o
+
+# Ignore all object files in any subdirectory
+**/*.o

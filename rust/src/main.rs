@@ -6,6 +6,7 @@ use ort::value::TensorRef;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model_path = "/Users/shivaram/telemetry-anomaly-detector/Model/model/telemetry_autoencoder.onnx";
+    let features_count = 14_f32;
 
     let mut session = Session::builder()?
     .commit_from_file(model_path)?;
@@ -32,7 +33,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             let array = Array2::from_shape_vec((1, 14), float.clone())?;
             let outputs = session.run(inputs![TensorRef::from_array_view(&array)?])?;
-            println!("{:?}", outputs);
+            let reconstructed = outputs[0].try_extract_tensor::<f32>()?;
+
+            let mse = array.iter()
+            .zip(reconstructed.1.iter())
+            .map(|(original, reconstructed)| (original - reconstructed).powi(2))
+            .sum::<f32>() / (features_count as f32);
+
+            println!("{:?}", mse);
         }
     }
 
