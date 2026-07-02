@@ -1,1 +1,3 @@
 Makefile linguist-detectable=false
+*.py linguist-language=Python
+*.rs linguist-language=Rust
