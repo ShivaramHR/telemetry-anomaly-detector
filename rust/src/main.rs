@@ -2,9 +2,11 @@ use std::net::UdpSocket;
 use ndarray::Array2;
 use ort::{inputs, session::Session};
 use ort::value::TensorRef;
+// use std::time::Instant;
 
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // let start = Instant::now();
     let model_path = "/Users/shivaram/telemetry-anomaly-detector/Model/model/telemetry_autoencoder.onnx";
     let features_count = 14_f32;
 
@@ -22,7 +24,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Message sent to python initiating the sending process!");
 
     let mut buf = [0;60];
-    for _ in 0..1{
+    let mut anomalies = Vec::<f32>::new();
+    let mut regular = Vec::<f32>::new();
+    for i in 0..3000{
         let (amt, _src) = socket.recv_from(& mut buf)?;
         if amt == 60 {
             let composite_id = u32::from_le_bytes(buf[0..4].try_into().unwrap());
@@ -40,9 +44,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|(original, reconstructed)| (original - reconstructed).powi(2))
             .sum::<f32>() / (features_count as f32);
 
-            println!("{:?}", mse);
+            let threshold = 0.05;
+            if mse > threshold {
+                anomalies.push(mse);
+            }
+            else {
+                regular.push(composite_id as f32);
+            }
+            println!("{i}");
         }
     }
+    // let end = start.elapsed();
+    // println!("{:?}", end);
+    println!("{:?}", anomalies);
+    println!("Done, The number of anomalies detected: {}", anomalies.len());
+    println!("The number of regular data points: {}", regular.len());
 
     Ok(())
 }
