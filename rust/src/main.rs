@@ -3,6 +3,21 @@ use ndarray::Array2;
 use ort::{inputs, session::Session};
 use ort::value::TensorRef;
 // use std::time::Instant;
+use std::fs::OpenOptions;
+use std::io::Write;
+
+fn log_all_mse(composite_ids: &Vec<u32>, all_mse: &Vec<f32>) {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("all_mse_log.csv")
+        .expect("Unable to open file");
+    writeln!(file, "composite_id,mse").expect("Unable to write header to file");
+
+    for (composite_id, mse) in composite_ids.iter().zip(all_mse.iter()) {
+        writeln!(file, "{},{}", composite_id, mse).expect("Unable to write to file");
+    }
+}
 
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,10 +41,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut buf = [0;60];
     let mut anomalies = Vec::<f32>::new();
     let mut regular = Vec::<f32>::new();
-    for i in 0..3000{
+    let mut all_mse = Vec::<f32>::new();
+    let mut composite_ids = Vec::<u32>::new();
+    for i in 0..13096{
         let (amt, _src) = socket.recv_from(& mut buf)?;
         if amt == 60 {
             let composite_id = u32::from_le_bytes(buf[0..4].try_into().unwrap());
+            composite_ids.push(composite_id);
             let float: Vec<f32> = buf[4..60]
             .chunks_exact(4)
             .map(|chunk| f32::from_le_bytes(chunk.try_into().unwrap()))
@@ -44,21 +62,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|(original, reconstructed)| (original - reconstructed).powi(2))
             .sum::<f32>() / (features_count as f32);
 
-            let threshold = 0.05;
+            let threshold = 0.04;
             if mse > threshold {
                 anomalies.push(mse);
             }
             else {
-                regular.push(composite_id as f32);
+                regular.push(mse);
             }
+            all_mse.push(mse);
             println!("{i}");
         }
     }
     // let end = start.elapsed();
     // println!("{:?}", end);
-    println!("{:?}", anomalies);
+    // println!("{:?}", anomalies);
     println!("Done, The number of anomalies detected: {}", anomalies.len());
     println!("The number of regular data points: {}", regular.len());
+    // println!("{:?}", regular);
+    println!("{:?}", all_mse);
+
+    log_all_mse(&composite_ids, &all_mse);
 
     Ok(())
 }

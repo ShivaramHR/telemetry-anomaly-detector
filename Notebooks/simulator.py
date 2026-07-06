@@ -22,7 +22,7 @@ next_time = time.time()
 
 try:
     _, address = server.recvfrom(1024)
-    for i in range(0, 2):     
+    for i in range(0,13096):     
         next_time += interval
 
         id = int(identifier[i])
@@ -38,4 +38,5 @@ try:
 except KeyboardInterrupt:
     print("The user interrupted, Stopping the program!")
 finally:
+    print("Closing the server...")
     server.close()
