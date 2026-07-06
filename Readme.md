@@ -1,4 +1,4 @@
-# NetSentinel — Real-Time Engine Anomaly Detection
+# Real-Time Engine Anomaly Detection
 
 A real-time predictive maintenance system that streams turbofan engine sensor telemetry from Python to a native Rust inference engine. The autoencoder is trained in Python, exported to ONNX, and deployed in Rust via UDP for low-latency anomaly scoring with no Python dependency at inference time.
 
@@ -6,7 +6,7 @@ A real-time predictive maintenance system that streams turbofan engine sensor te
 
 ## Architecture
 
-```
+```mermaid
 graph TD
     classDef python fill:#3572A5,stroke:#fff,stroke-width:2px,color:#fff;
     classDef rust fill:#DEA584,stroke:#fff,stroke-width:2px,color:#000;
@@ -29,7 +29,7 @@ graph TD
     class A,C python;
     class E,F,G,H,I rust;
     class B,D file;
-```
+``` 
 
 ---
 
