@@ -67,26 +67,26 @@ telemetry-anomaly-detection/
 
 ## Phase 1: EDA & Preprocessing (Python)
 
-    To ensure the Autoencoder learns meaningful degradation patterns rather than static noise, the raw dataset (20631, 18) was heavily optimized:
+To ensure the Autoencoder learns meaningful degradation patterns rather than static noise, the raw dataset (20631, 18) was heavily optimized:
 
-    Feature Engineering: Added RUL (Remaining Useful Life) and Degradation State.
+Feature Engineering: Added RUL (Remaining Useful Life) and Degradation State.
 
-    Noise Reduction: Dropped sensor columns with constant variance that do not change over the engine's lifespan (sensor_1, sensor_5, sensor_6, sensor_10, sensor_16, sensor_18, sensor_19).
+Noise Reduction: Dropped sensor columns with constant variance that do not change over the engine's lifespan (sensor_1, sensor_5, sensor_6, sensor_10, sensor_16, sensor_18, sensor_19).
 
-    Operational Settings: Dropped op_setting columns as their variance was close to 0.
+Operational Settings: Dropped op_setting columns as their variance was close to 0.
 
-    Final Target: The dataset was reduced to a lean (20631, 14) shape. RUL was dropped post-analysis to train the model purely on real-time features.
+Final Target: The dataset was reduced to a lean (20631, 14) shape. RUL was dropped post-analysis to train the model purely on real-time features.
 
 ---
 
 ## Phase 2: The Autoencoder Model
 
-    The neural network utilizes a bottleneck architecture to learn the signature of a "healthy" engine:
-    14 → 16 → 8 → 4 → 8 → 14
+The neural network utilizes a bottleneck architecture to learn the signature of a "healthy" engine:
+14 → 16 → 8 → 4 → 8 → 14
 
-    The Challenge: Initial iterations yielded a flat, consistent loss curve (~0.0039) regardless of the engine's degradation state.
+The Challenge: Initial iterations yielded a flat, consistent loss curve (~0.0039) regardless of the engine's degradation state.
 
-    The Fix: Applied L2 Regularization. This forced the model to correctly reconstruct early-cycle (healthy) engines while failing to reconstruct late-cycle (failing) engines, causing a measurable spike in the MSE (Mean Squared Error).
+The Fix: Applied L2 Regularization. This forced the model to correctly reconstruct early-cycle (healthy) engines while failing to reconstruct late-cycle (failing) engines, causing a measurable spike in the MSE (Mean Squared Error).
 
 ---
 
