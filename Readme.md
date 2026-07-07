@@ -105,7 +105,7 @@ Bytes 4-59: 56 bytes representing the 14 f32 sensor readings.
 Rust decodes these raw bytes instantly via chunks_exact(4) and f32::from_le_bytes, passing them to the ndarray and ort ONNX runtime for sub-millisecond inference.
 
 ---
-
+## TODO
 ## Phase 4: Dynamic Thresholding & Anomaly Detection
 
 Finding the perfect static threshold proved challenging due to statistical distribution overlap:
