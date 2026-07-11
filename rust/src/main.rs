@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Done, The number of anomalies detected: {}", anomalies.len());
     println!("The number of regular data points: {}", regular.len());
     // println!("{:?}", regular);
-    println!("{:?}", all_mse);
+    // println!("{:?}", all_mse);
 
     log_all_mse(&composite_ids, &all_mse);
 
