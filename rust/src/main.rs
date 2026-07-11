@@ -10,7 +10,7 @@ fn log_all_mse(composite_ids: &Vec<u32>, all_mse: &Vec<f32>) {
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("all_mse_log.csv")
+        .open("test_mse_log.csv")
         .expect("Unable to open file");
     writeln!(file, "composite_id,mse").expect("Unable to write header to file");
 
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut regular = Vec::<f32>::new();
     let mut all_mse = Vec::<f32>::new();
     let mut composite_ids = Vec::<u32>::new();
-    for i in 0..13096{
+    for i in 0..2000{
         let (amt, _src) = socket.recv_from(& mut buf)?;
         if amt == 60 {
             let composite_id = u32::from_le_bytes(buf[0..4].try_into().unwrap());
@@ -62,16 +62,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|(original, reconstructed)| (original - reconstructed).powi(2))
             .sum::<f32>() / (features_count as f32);
 
-            let threshold = 0.04;
+            all_mse.push(mse);
+            let time_in_cycle = composite_id % 1000;
+
+            let mut threshold = 0.04;
+            if time_in_cycle < 20 {
+                threshold = 0.05;
+            }
+
             if mse > threshold {
                 anomalies.push(mse);
-            }
+            } 
             else {
                 regular.push(mse);
             }
-            all_mse.push(mse);
-            println!("{i}");
         }
+        println!("{i}");
     }
     // let end = start.elapsed();
     // println!("{:?}", end);

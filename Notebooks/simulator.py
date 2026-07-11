@@ -22,7 +22,7 @@ next_time = time.time()
 
 try:
     _, address = server.recvfrom(1024)
-    for i in range(0,13096):     
+    for i in range(0,2000):     
         next_time += interval
 
         id = int(identifier[i])
