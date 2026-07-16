@@ -10,7 +10,7 @@ fn log_all_mse(composite_ids: &Vec<u32>, all_mse: &Vec<f32>) {
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("test_mse_log.csv")
+        .open("all_mse_log.csv")
         .expect("Unable to open file");
     writeln!(file, "composite_id,mse").expect("Unable to write header to file");
 
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut regular = Vec::<f32>::new();
     let mut all_mse = Vec::<f32>::new();
     let mut composite_ids = Vec::<u32>::new();
-    for i in 0..2000{
+    for i in 0..2594{
         let (amt, _src) = socket.recv_from(& mut buf)?;
         if amt == 60 {
             let composite_id = u32::from_le_bytes(buf[0..4].try_into().unwrap());

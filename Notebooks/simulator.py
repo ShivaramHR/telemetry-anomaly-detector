@@ -13,8 +13,9 @@ server.bind((HOST, PORT))
 print("Server is active")
 
 #test dataset
-features = np.load("/Users/shivaram/telemetry-anomaly-detector/Data/Test_Data/scaled_features.npy") 
-identifier = np.load("/Users/shivaram/telemetry-anomaly-detector/Data/Test_Data/identifiers.npy")
+features = np.load("/Users/shivaram/telemetry-anomaly-detector/Data/Test_Data_V2/scaled_features.npy") 
+identifier = np.load("/Users/shivaram/telemetry-anomaly-detector/Data/Test_Data_V2/IDS.npy").flatten()
+# print(identifier.flatten().shape)
 
 
 interval = 0.100
@@ -22,7 +23,7 @@ next_time = time.time()
 
 try:
     _, address = server.recvfrom(1024)
-    for i in range(0,2000):     
+    for i in range(0,2594):     
         next_time += interval
 
         id = int(identifier[i])
