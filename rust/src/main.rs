@@ -65,9 +65,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             all_mse.push(mse);
             let time_in_cycle = composite_id % 1000;
 
-            let mut threshold = 0.04;
+            let mut threshold = 0.175;
             if time_in_cycle < 20 {
-                threshold = 0.05;
+                threshold = 0.2;
             }
 
             if mse > threshold {

@@ -1,158 +1,163 @@
 # Telemetry Anomaly Detector
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-3572A5?logo=python&logoColor=white)
-![Rust](https://img.shields.io/badge/Rust-stable-DEA584?logo=rust&logoColor=black)
-![ONNX Runtime](https://img.shields.io/badge/ONNX-Runtime-005CED?logo=onnx&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
-![Status](https://img.shields.io/badge/status-active--development-yellow)
-
-A real-time anomaly detection pipeline for industrial turbofan engines. An Autoencoder is trained in Python on NASA's CMAPSS FD001 degradation dataset, exported to ONNX, and served through a native Rust UDP daemon that performs sub-millisecond inference on live sensor streams.
-
-**Repository:** `github.com/ShivaramHR/telemetry-anomaly-detection` (update if the path differs)
+A real-time predictive maintenance system that streams turbofan engine sensor telemetry from Python to a native Rust inference engine over UDP. An autoencoder is trained in Python on NASA's CMAPS dataset, exported to ONNX, and deployed in Rust for low-latency anomaly scoring with no Python dependency at inference time.
 
 ---
-
-## Overview
-
-Most anomaly detection prototypes stop at a Jupyter notebook. This project pushes a trained model into a production-style inference path: a Python side handles research (EDA, training, ONNX export, packet simulation), and a Rust side handles deployment (UDP ingestion, tensor shaping, ONNX execution, reconstruction-error scoring). The goal is to demonstrate the full loop from raw sensor data to a running inference service, not just a model that scores well offline.
 
 ## Architecture
 
 ```mermaid
 graph TD
-    %% Styling
     classDef python fill:#3572A5,stroke:#fff,stroke-width:2px,color:#fff;
     classDef rust fill:#DEA584,stroke:#fff,stroke-width:2px,color:#000;
     classDef file fill:#444,stroke:#fff,stroke-width:1px,color:#fff;
 
-    subgraph Python_Side [Python: Research and Simulation]
-        A[AutoEncoder.ipynb] -->|1. Train and Export| B[tf_auto_encoder.onnx]
-        C[simulator.py] -->|2. Stream 60-byte UDP packets| D[Rust Network Layer]
-    end
+    A[FD001: healthy-cycle training data] -->|Train autoencoder| B[notebook.ipynb]
+    B -->|Export| C[autoencoder.onnx]
+    D[FD003: first 9 units, full lifecycle] -->|simulator.py streams 60-byte UDP packets| E[Rust Inference Engine]
+    C -->|Loaded once at startup| E
+    E -->|ndarray shaping to ort forward pass to MSE| F[inference_log.csv]
+    F -->|composite_id decoded back to unit + cycle| G[Threshold calibration and validation plots]
 
-    subgraph Rust_Side [Rust: Production Inference Engine]
-        B -->|3. Load into memory| E[main.rs Orchestrator]
-        D -->|4. Parse bytes to f32| E
-        E --> F[ndarray Tensor Shaping]
-        F --> G[ort Crate: Native Model Execution]
-        G --> H[MSE Loss Calculation]
-        H -->|5. If score exceeds threshold| I[Append to alerts.log]
-    end
-
-    class A,C python;
-    class E,F,G,H,I rust;
-    class B,D file;
+    class A,B,D,G python;
+    class E rust;
+    class C,F file;
 ```
+
+---
 
 ## Project Structure
 
 ```
-telemetry-anomaly-detection/
-├── Readme.md                          # Documentation and flowcharts
-├── CMAPSSData/                        # Raw engine degradation dataset
-│   ├── damage_propagation_modeling.pdf # NASA dataset background and methodology
-│   └── readme.txt                     # Dataset instructions
-└── Model/                             # Core ML and inference pipeline
-    ├── autoencoder.keras              # Native Keras 3 model architecture and weights
-    ├── model/                         # Exported deployment models
-    │   ├── tf_saved_model/            # Intermediate SavedModel directory format
-    │   └── tf_auto_encoder.onnx       # Compiled ONNX execution graph for Rust
-    ├── Notebooks/                     # Python research and simulation environment
-    │   ├── AutoEncoder.ipynb          # Training pipeline and architecture
-    │   ├── EDA.ipynb                  # Exploratory data analysis and preprocessing
-    │   ├── test_data_preparation.ipynb # Data split and cleaning logic
-    │   └── simulator.py               # 100Hz UDP mock packet injector
-    └── rust/                          # Rust side: native production inference
-        └── src/
-            └── main.rs                # Orchestrator, UDP network layer, ONNX execution
+telemetry-anomaly-detector/
+├── README.md
+├── trainer-simulator/              # Python: training and evaluation
+│   ├── data/
+│   │   └── training_telemetry.csv
+│   ├── notebook.ipynb              # EDA, preprocessing, training, ONNX export, validation
+│   ├── simulator.py                # UDP packet injector (streams engine telemetry)
+│   └── requirements.txt
+│
+└── monitor-engine/                 # Rust: production inference engine
+    ├── Cargo.toml
+    ├── autoencoder.onnx
+    └── src/
+        ├── main.rs                 # UDP loop, byte parsing, inference, MSE, threshold
+        └── network.rs              # Socket binding and packet ingestion
 ```
 
 ---
 
-## How It Works
+## Dataset & Training
 
-### Phase 1: Data Preprocessing (Python)
+NASA CMAPS (Commercial Modular Aero-Propulsion System Simulation). The autoencoder is trained on the FD001 training split — 100 turbofan engines, 20,631 total readings across 21 raw sensors and 3 operating-condition settings.
 
-The raw dataset (20,631 rows x 18 columns) was reduced to remove features that carry no signal:
+**Feature selection.** Seven sensors with near-zero variance across all cycles were dropped as they carry no signal: `sensor_1`, `sensor_5`, `sensor_6`, `sensor_10`, `sensor_16`, `sensor_18`, `sensor_19`. All three operating-setting columns were also dropped for the same reason. This leaves 14 sensor features.
 
-- **Constant-variance sensors dropped:** `sensor_1`, `sensor_5`, `sensor_6`, `sensor_10`, `sensor_16`, `sensor_18`, `sensor_19` do not change over an engine's lifespan and add noise rather than information.
-- **Operational settings dropped:** variance close to zero across the fleet.
-- **RUL (Remaining Useful Life)** was engineered during analysis, then dropped from the final training set so the model learns from real-time sensor features only, not a label that would not exist at inference time.
+**Training data is restricted to healthy cycles only.** The autoencoder is trained exclusively on early-life (pre-degradation) cycles from each engine. It never sees a degraded sensor reading during training. At inference, a reading that falls outside the learned "normal operation" manifold produces high reconstruction error this is the entire anomaly signal, and no failure labels are needed to produce it.
 
-Final shape: 20,631 x 14.
+**No labels are used during training.** The model is trained with `fit(X, X)` under MSE loss. `degradation_state` (computed as `time_in_cycles / max_cycles` per engine) and RUL are computed and retained in the dataset only for post-training validation plots — never as a training target.
 
-### Phase 2: The Autoencoder
+Final training matrix shape: `(20631, 14)`.
 
-Bottleneck architecture: `14 -> 16 -> 8 -> 4 -> 8 -> 14`. The model is trained only on healthy (early-cycle) engine data, so it learns to reconstruct "normal" sensor patterns well and reconstructs degraded patterns poorly. Reconstruction error (MSE) becomes the anomaly signal.
+### A note on evaluation data
 
-**Problem encountered:** the first version produced a flat reconstruction-loss curve (~0.0039) regardless of engine degradation state. The model was reconstructing everything equally well, which meant it was not learning a meaningful "healthy" manifold.
+CMAPS's official test splits (e.g. `test_FD001`) are deliberately truncated before each engine fails they're built for the dataset's original task of predicting *remaining* useful life, where the true failure point is withheld in a separate `RUL_FD001.txt` file. Evaluating an anomaly detector on this data is misleading: a model can look inconclusive not because it's wrong, but because the test rows simply never reach genuine end-of-life behavior.
 
-**Fix:** L2 regularization on the bottleneck layers. This constrained the model enough that it could no longer trivially reconstruct late-cycle (degraded) engines, producing a measurable MSE spike as engines approached failure.
-
-### Phase 3: The Rust Inference Engine
-
-**Why UDP instead of TCP:** in a real-time telemetry context, a dropped packet should be discarded, not retransmitted. TCP would stall the stream to recover a packet that is already stale by the time it arrives. UDP lets the engine skip the loss and process the newest reading immediately, which matters more than guaranteed delivery for this use case.
-
-**Wire protocol (60 bytes per packet):**
-
-| Bytes | Content |
-|-------|---------|
-| 0-3   | Composite ID: `unit_number * 1000 + time_in_cycles` |
-| 4-59  | 14 sensor readings as little-endian f32 (56 bytes) |
-
-The Rust side decodes this with `chunks_exact(4)` and `f32::from_le_bytes`, shapes the result into an `ndarray` tensor, and runs it through the `ort` crate's ONNX runtime for inference.
+Once this was identified, evaluation was moved to the **first 9 engines of the FD003 training split**, which contains full run-to-failure trajectories under the same single operating condition as FD001. This gives a genuine view of reconstruction error across an engine's complete lifecycle, including true failure. One caveat worth noting: FD003 introduces a second fault mode (fan degradation in addition to HPC degradation) not present in FD001's training data, so this evaluation demonstrates generalization to unseen data rather than a like-for-like train/test split.
 
 ---
 
-## Roadmap
+## Design Highlights
 
-### Phase 4: Dynamic Thresholding (planned, not yet implemented)
+**L2 regularization.** An earlier version of the autoencoder trained on the full dataset (healthy and degraded cycles together), without weight regularization produced a flat reconstruction-error signal that didn't separate healthy from degraded engines; the model had simply learned to reconstruct both equally well. Adding L2 regularization (encoder/decoder weights) forced the model toward a more compact representation of the dominant pattern in the training data, which improved separation. Restricting training data to healthy cycles only (above) is the more direct fix for the same underlying problem, and is retained alongside L2 in the final configuration.
 
-A single static threshold does not hold up across an engine's full lifecycle:
+**Composite packet ID.** Each UDP packet is 60 bytes: a 4-byte composite identifier (`unit_number * 1000 + time_in_cycles`) followed by 56 bytes of sensor data (14 × f32, little-endian). This lets the Rust binary log a stable, decodable identifier per packet without needing separate metadata fields, and lets Python reconstruct unit and cycle after a run purely from the log.
 
-- **0.05:** too conservative. Flagged only 3 of 3,000 points; missed early warning signs.
-- **0.03:** too sensitive. Flagged 231 points (7.7%), and 63.9% of those false alarms occurred during the engine's early life (<= 70% of cycle life), where break-in noise is expected and not a sign of degradation.
+**UDP over TCP for telemetry streaming.** A dropped packet under TCP stalls the connection while it's retransmitted, delaying everything behind it. For real-time telemetry, a sensor reading from 30ms ago is already stale by the time a retry would deliver it the system needs the most current reading, not a guaranteed-complete history. UDP delivers what arrives and moves on, which matches that requirement.
 
-The planned fix is a threshold that varies with `time_in_cycles` (already available from the composite ID): loose during early cycles to tolerate break-in noise, tightening as the engine ages to catch micro-degradations closer to failure. This is the next piece of work on this project.
+---
 
-## Tech Stack
+## Model Validation
 
-- **Python** — data analysis, model training (Keras/TensorFlow), ONNX export, packet simulation
-- **Rust** — UDP networking, tensor shaping (`ndarray`), inference (`ort`)
-- **ONNX** — portable model format bridging the training and inference environments
+Two validation passes were run against the final (healthy-only, L2-regularized) model:
 
-## Getting Started
+**Against FD001 test data** (still subject to the truncation caveat above, but useful as a like-for-like comparison against the earlier model): reconstruction error rises to roughly **0.6** by the end of the available window, compared to a peak of roughly **0.12–0.15** for the earlier full-dataset-trained model on the same data — a clear improvement in separation, even on a test set that doesn't reach true failure.
 
-**Train and export the model:**
-```bash
-cd Model/Notebooks
-jupyter notebook AutoEncoder.ipynb
-# Trains the autoencoder and exports Model/model/tf_auto_encoder.onnx
+**Against FD003, first 9 engines** (full run-to-failure trajectories): reconstruction error stays low and largely flat through the bulk of each engine's operating life, then rises sharply in the final stretch before failure, peaking above **1.5** for some sampled eengines and **0.2 - 0.3** for the others.
+
+### Threshold calibration
+
+The final operating threshold was calibrated empirically against the observed FD003 error distribution, rather than through a formal precision/recall or ROC sweep:
+
+| Cycle range | Threshold |
+|---|---|
+| Early-life cycles | 0.20 |
+| All other cycles | 0.175 |
+
+| Metric | Value |
+|---|---|
+| Total data points evaluated (9 engines) | 2,594 |
+| Flagged as anomalous | 422 (16.3%) |
+| Regular (below threshold) | 2,172 |
+
+The flagged rate looks high in aggregate, but it isn't 422 isolated false alarms spread across otherwise-healthy engines. A handful of engines in this sample reach reconstruction error above 2.0 and *stay* elevated for many consecutive cycles once true degradation sets in those engines alone account for a large share of the flagged count. The rest of the sample sits comfortably in the 0.2–0.3 range nearing end of its lifetime.
+
+---
+
+## Rust Inference Engine
+
+The Rust binary loads `autoencoder.onnx` once at startup using the `ort` crate (ONNX Runtime 2.0). For each received packet, it parses the 4-byte composite ID, decodes 14 little-endian f32 values into an `ndarray::Array2<f32>` of shape `(1, 14)`, runs a forward pass through the ONNX session, and computes MSE between input and reconstruction. Results are logged to `inference_log.csv` as `composite_id, mse` for every packet received — not just the ones that cross the threshold — so the full error trace can be reconstructed and analyzed afterward.
+
+```python
+# Python: decoding the log after a run
+df = pd.read_csv("inference_log.csv")
+df["unit_number"]    = df["composite_id"] // 1000
+df["time_in_cycles"] = df["composite_id"] % 1000
 ```
 
-**Run the Rust inference engine:**
+---
+
+## Limitations & Future Work
+
+This project is considered complete at its current configuration. Known limitations and natural next steps:
+
+- **Threshold selection was empirical, not systematic.** A formal precision/recall or ROC-based sweep against labeled failure windows would give a more defensible operating point than the current visually-calibrated values.
+- **Evaluation covers 9 of FD003's engines**, not the full set. Extending to all FD003 engines, or to FD002/FD004 (which add operating-condition variation), would give a stronger generalization claim.
+- **A single global threshold** doesn't account for engines with a naturally elevated healthy-phase baseline. A per-engine adaptive threshold was considered and deliberately left out of scope for this iteration, since it requires tracking rolling state per engine in the Rust binary a reasonable next step, but a different, larger project.
+
+---
+
+## Setup
+
+**Python**
 ```bash
-cd Model/rust
+cd trainer-simulator
+pip install -r requirements.txt
+jupyter notebook notebook.ipynb
+```
+
+**Rust**
+```bash
+cd monitor-engine
 cargo build --release
 cargo run --release
 ```
 
-**Simulate a live sensor stream:**
-```bash
-cd Model/Notebooks
-python simulator.py
-# Streams 60-byte UDP packets at 100Hz to the Rust engine
+**Cargo.toml dependencies**
+```toml
+[dependencies]
+ort = { version = "2.0.0-rc.12", features = ["download-binaries"] }
+ndarray = "0.16"
 ```
 
-Anomalies exceeding the reconstruction-error threshold are appended to `alerts.log`.
+Run the Python simulator to stream packets to the Rust engine:
+```bash
+python simulator.py
+```
 
-## Engineering Highlights
+---
 
-- End-to-end ML system, not just a notebook: training, export, and a native inference service are all part of the same repository.
-- Diagnosed and fixed a real training failure (flat loss curve masking degradation signal) using L2 regularization, rather than treating a converging loss as automatic success.
-- Chose UDP over TCP deliberately, based on the actual latency requirements of the problem rather than defaulting to the more common protocol.
-- Built the inference path in Rust for deterministic, low-latency execution, using `ort` for native ONNX inference and `ndarray` for tensor shaping.
-- Identified a threshold miscalibration through direct analysis of false-alarm distribution across engine lifecycle stage, and designed a dynamic thresholding scheme to address it.
+## Tech Stack
 
-## License
-MIT
+Python 3.11, Keras (TensorFlow), NumPy, Pandas, scikit-learn, ONNX, Rust 1.88, `ort` 2.0, `ndarray` 0.16
