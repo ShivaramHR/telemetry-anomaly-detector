@@ -43,14 +43,13 @@ telemetry-anomaly-detector/
     ├── autoencoder.onnx
     └── src/
         ├── main.rs                 # UDP loop, byte parsing, inference, MSE, threshold
-        └── network.rs              # Socket binding and packet ingestion
 ```
 
 ---
 
 ## Dataset & Training
 
-NASA CMAPS (Commercial Modular Aero-Propulsion System Simulation). The autoencoder is trained on the FD001 training split — 100 turbofan engines, 20,631 total readings across 21 raw sensors and 3 operating-condition settings.
+NASA CMAPS (Commercial Modular Aero-Propulsion System Simulation). The autoencoder is trained on the FD001 training split 100 turbofan engines, 20,631 total readings across 21 raw sensors and 3 operating-condition settings.
 
 **Feature selection.** Seven sensors with near-zero variance across all cycles were dropped as they carry no signal: `sensor_1`, `sensor_5`, `sensor_6`, `sensor_10`, `sensor_16`, `sensor_18`, `sensor_19`. All three operating-setting columns were also dropped for the same reason. This leaves 14 sensor features.
 
@@ -107,7 +106,7 @@ The flagged rate looks high in aggregate, but it isn't 422 isolated false alarms
 
 ## Rust Inference Engine
 
-The Rust binary loads `autoencoder.onnx` once at startup using the `ort` crate (ONNX Runtime 2.0). For each received packet, it parses the 4-byte composite ID, decodes 14 little-endian f32 values into an `ndarray::Array2<f32>` of shape `(1, 14)`, runs a forward pass through the ONNX session, and computes MSE between input and reconstruction. Results are logged to `inference_log.csv` as `composite_id, mse` for every packet received — not just the ones that cross the threshold — so the full error trace can be reconstructed and analyzed afterward.
+The Rust binary loads `autoencoder.onnx` once at startup using the `ort` crate (ONNX Runtime 2.0). For each received packet, it parses the 4-byte composite ID, decodes 14 little-endian f32 values into an `ndarray::Array2<f32>` of shape `(1, 14)`, runs a forward pass through the ONNX session, and computes MSE between input and reconstruction. Results are logged to `inference_log.csv` as `composite_id, mse` for every packet received not just the ones that cross the threshold so the full error trace can be reconstructed and analyzed afterward.
 
 ```python
 # Python: decoding the log after a run
